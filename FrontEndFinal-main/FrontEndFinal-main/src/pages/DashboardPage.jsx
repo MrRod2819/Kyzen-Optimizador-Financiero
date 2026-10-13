@@ -3,7 +3,7 @@ import { useFinancial } from '../context/AuthContext';
 import { PlusCircle, Brain, Loader2, Target, Calendar, AlertTriangle, TrendingDown, Sparkles, ShieldCheck } from 'lucide-react';
 
 export default function DashboardPage({ onNavigateToAiHub }) {
-  const { transactions, goals, isLoading, user, fetchTransactions, fetchGoals, formatAmount } = useFinancial();
+  const { transactions, goals, isLoading, user, fetchTransactions, fetchGoals, formatAmount, dashboardData } = useFinancial();
 
   useEffect(() => {
     if (fetchTransactions) fetchTransactions();
@@ -19,8 +19,9 @@ export default function DashboardPage({ onNavigateToAiHub }) {
   const currentBalance = totalIncome - totalExpenses;
 
   // --- 📊 DISTRIBUCIÓN POR CATEGORÍAS (LAS 6 OFICIALES) ---
-  const categories = ['Viaje', 'Transporte', 'Estudios', 'Servicios', 'Hogar', 'Otros'];
+  const categories = ['Comida', 'Viaje', 'Transporte', 'Estudios', 'Servicios', 'Hogar', 'Otros'];
   const categoryColors = {
+    Comida: '#6366f1',
     Viaje: '#818cf8',
     Transporte: '#93c5fd',
     Estudios: '#22d3ee',
@@ -134,6 +135,14 @@ export default function DashboardPage({ onNavigateToAiHub }) {
   return (
     <div className="space-y-8 animate-fadeIn w-full pb-12 select-none">
       
+      {/* HU-20: alerta temprana por umbral (>80% del presupuesto mensual) */}
+      {dashboardData?.alertBanner && (
+        <div role="alert" className="bg-rose-50 border-l-4 border-rose-500 p-4 rounded-r-xl shadow-sm flex items-start gap-3">
+          <AlertTriangle className="text-rose-600 shrink-0 mt-0.5" size={20} />
+          <p className="text-sm text-rose-800 font-bold">{dashboardData.alertBanner}</p>
+        </div>
+      )}
+
       {/* Saludo */}
       <div>
         <h2 className="text-3xl font-black text-slate-900 tracking-tight">

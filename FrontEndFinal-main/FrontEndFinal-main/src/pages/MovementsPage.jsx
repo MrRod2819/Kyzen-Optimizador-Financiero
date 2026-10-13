@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useFinancial } from '../context/AuthContext';
 import { 
-  ArrowLeft, Save, Plane, Car, GraduationCap, Zap, Home, 
+  ArrowLeft, Save, Utensils, Plane, Car, GraduationCap, Zap, Home, 
   MoreHorizontal, FileText, Plus, Search 
 } from 'lucide-react';
 
@@ -10,7 +10,7 @@ export default function MovementsPage({ isCreating, setIsCreating }) {
 
   const [type, setType] = useState('GASTO');
   const [amount, setAmount] = useState('');
-  const [category, setCategory] = useState('Otros'); 
+  const [category, setCategory] = useState(''); // HU-01: la categoría es obligatoria en gastos
   const [description, setDescription] = useState('');
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 16));
   const [file, setFile] = useState(null);
@@ -20,6 +20,7 @@ export default function MovementsPage({ isCreating, setIsCreating }) {
   const [searchTerm, setSearchTerm] = useState('');
 
   const categoriesList = [
+    { id: 'Comida', label: 'Comida', icon: Utensils },
     { id: 'Viaje', label: 'Viaje', icon: Plane },
     { id: 'Transporte', label: 'Transporte', icon: Car },
     { id: 'Estudios', label: 'Estudios', icon: GraduationCap },
@@ -29,9 +30,7 @@ export default function MovementsPage({ isCreating, setIsCreating }) {
   ];
 
   useEffect(() => {
-    if (type === 'INGRESO') {
-      setCategory('Otros');
-    }
+    setCategory(type === 'INGRESO' ? 'Otros' : '');
   }, [type]);
 
   const activeTransactions = transactions?.length > 0 ? transactions : [
@@ -65,17 +64,41 @@ export default function MovementsPage({ isCreating, setIsCreating }) {
       return;
     }
 
+    if (type === 'GASTO' && !category) {
+      setStatusMsg({ type: 'error', text: 'Selecciona una categoría para registrar el gasto.' });
+      return;
+    }
+
     setFormLoading(true);
     try {
-      await addTransaction({
+      let voucher;
+      if (file) {
+        voucher = {
+          mimeType: file.type,
+          data: await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          })
+        };
+      }
+      const result = await addTransaction({
         type: type === 'GASTO' ? 'Gasto' : 'Ingreso',
         amount: parseFloat(amount),
         category: type === 'GASTO' ? category : 'Otros',
         description,
-        date: new Date(date).toISOString()
+        date: new Date(date).toISOString(),
+        voucher
       });
 
+      if (!result?.success) {
+        setStatusMsg({ type: 'error', text: result?.message || 'No se pudo guardar el movimiento.' });
+        return;
+      }
+
       setStatusMsg({ type: 'success', text: '¡Transacción guardada con éxito!' });
+      setFile(null);
       setAmount('');
       setDescription('');
       
@@ -241,13 +264,23 @@ export default function MovementsPage({ isCreating, setIsCreating }) {
                   <div className="relative border border-slate-200 border-dashed rounded-xl py-3 px-4 bg-slate-50 text-slate-400 text-sm flex items-center gap-2">
                     <FileText size={16} />
                     <span>{file ? file.name : "Adjuntar Archivo"}</span>
-                    <input type="file" onChange={(e) => setFile(e.target.files[0])} className="absolute inset-0 opacity-0 cursor-pointer" />
+                    <input type="file" accept="image/jpeg,image/png" onChange={(e) => {
+                      const picked = e.target.files[0];
+                      if (!picked) return setFile(null);
+                      if (!['image/jpeg', 'image/png'].includes(picked.type) || picked.size > 5 * 1024 * 1024) {
+                        setFile(null);
+                        e.target.value = '';
+                        setStatusMsg({ type: 'error', text: 'La boleta debe ser JPG o PNG de máximo 5MB.' });
+                        return;
+                      }
+                      setFile(picked);
+                    }} className="absolute inset-0 opacity-0 cursor-pointer" />
                   </div>
                 </div>
               </div>
 
               <div className="flex flex-col items-center gap-2 pt-4">
-                <button type="submit" disabled={formLoading} className="w-full max-w-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl shadow-md text-sm disabled:opacity-50">
+                <button type="submit" disabled={formLoading || !(parseFloat(amount) > 0) || (type === 'GASTO' && !category)} className="w-full max-w-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl shadow-md text-sm disabled:opacity-50">
                   {formLoading ? 'Guardando...' : 'Guardar movimiento'}
                 </button>
                 <button type="button" onClick={() => setIsCreating(false)} className="text-xs font-bold text-slate-400 hover:text-slate-600 py-1">Cancelar</button>
